@@ -8,8 +8,8 @@ from icalendar import Calendar
 
 def convert(filename):
     with open(filename + '.csv', 'w', newline='', encoding='utf-8') as csv_file:
-        fieldnames = ['DTSTART', 'DTEND', 'SUMMARY', 'DESCRIPTION']
-        writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+        fieldnames = ['DTSTART', 'DTEND', 'SUMMARY', 'ATTENDEES', 'DESCRIPTION']
+        writer = csv.DictWriter(csv_file, fieldnames=fieldnames, delimiter='\t')
         writer.writeheader()
         with open(filename + '.ics', 'rb') as f:
             cal = Calendar.from_ical(f.read())
@@ -26,9 +26,27 @@ def convert(filename):
                         if type(dic[time]) is datetime.date:
                             dic[time] = datetime.datetime.combine(dic[time], datetime.time())
                         dic[time] = dic[time].astimezone(TIMEZONE)
+
+                    # Check if SUMMARY is present in component before accessing it
+                    if 'SUMMARY' in component:
+                        dic['SUMMARY'] = component['SUMMARY'].to_ical().decode()
+                    else:
+                        dic['SUMMARY'] = ''
+
+                    # Check if DESCRIPTION is present in component before accessing it
+                    if 'DESCRIPTION' in component:
+                        dic['DESCRIPTION'] = component['DESCRIPTION'].to_ical().decode().replace(r'\n', ' ')
+                    else:
+                        dic['DESCRIPTION'] = ''
+
+                    # Gather all ATTENDEE email addresses
+                    attendees = []
+                    for attendee in component.get('ATTENDEE', []):
+                        # Extract email address from the attendee field
+                        email = str(attendee).split(":")[-1]
+                        attendees.append(email)
+                    dic['ATTENDEES'] = ', '.join(attendees)
                     
-                    dic['SUMMARY'] = component['SUMMARY'].to_ical().decode()
-                    dic['DESCRIPTION'] = component['DESCRIPTION'].to_ical().decode().replace(r'\n', ' ')
                     writer.writerow(dic)
                 
                 
